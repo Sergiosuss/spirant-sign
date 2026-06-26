@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Подпись</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+h2 { margin-bottom: 6px; font-size: 18px; color: #333; }
+p.hint { font-size: 13px; color: #888; margin-bottom: 14px; }
+#canvas { background: white; border: 2px solid #ccc; border-radius: 8px; display: block; touch-action: none; cursor: crosshair; width: 100%; }
+.buttons { display: flex; gap: 12px; margin-top: 14px; width: 100%; }
+button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+#clear-btn { background: #eee; color: #333; }
+#submit-btn { background: #2481cc; color: white; font-weight: bold; }
+#submit-btn:disabled { background: #aaa; }
+</style>
+</head>
+<body>
+<h2>&#1055;&#1086;&#1076;&#1087;&#1080;&#1096;&#1080;&#1090;&#1077; &#1076;&#1086;&#1075;&#1086;&#1074;&#1086;&#1088;</h2>
+<p class="hint">&#1056;&#1072;&#1089;&#1087;&#1080;&#1096;&#1080;&#1090;&#1077;&#1089;&#1100; &#1087;&#1072;&#1083;&#1100;&#1094;&#1077;&#1084; &#1080;&#1083;&#1080; &#1084;&#1099;&#1096;&#1100;&#1102;</p>
+<canvas id="canvas"></canvas>
+<div class="buttons">
+  <button id="clear-btn">&#1054;&#1095;&#1080;&#1089;&#1090;&#1080;&#1090;&#1100;</button>
+  <button id="submit-btn">&#1055;&#1086;&#1076;&#1090;&#1074;&#1077;&#1088;&#1076;&#1080;&#1090;&#1100; &#10003;</button>
+</div>
+<script>
+  const tg = window.Telegram?.WebApp || null;
+  if (tg) { tg.ready(); tg.expand(); }
+  const userId = parseInt(new URLSearchParams(window.location.search).get('user_id') || '0');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, hasDrawn = false;
+  function setup() {
+    const w = window.innerWidth - 40;
+    canvas.width = w; canvas.height = 200;
+    canvas.style.width = w + 'px'; canvas.style.height = '200px';
+    ctx.strokeStyle = '#0000cc'; ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+  canvas.addEventListener('mousedown', e => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+  canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; });
+  canvas.addEventListener('mouseup', () => { drawing = false; });
+  canvas.addEventListener('mouseleave', () => { drawing = false; });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; }, { passive: false });
+  canvas.addEventListener('touchend', () => { drawing = false; });
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); hasDrawn = false;
+  });
+  document.getElementById('submit-btn').addEventListener('click', async () => {
+    if (!hasDrawn) { alert('&#1055;&#1086;&#1078;&#1072;&#1083;&#1091;&#1081;&#1089;&#1090;&#1072;, &#1087;&#1086;&#1089;&#1090;&#1072;&#1074;&#1100;&#1090;&#1077; &#1087;&#1086;&#1076;&#1087;&#1080;&#1089;&#1100;'); return; }
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.textContent = '&#1054;&#1090;&#1087;&#1088;&#1072;&#1074;&#1083;&#1103;&#1077;&#1084;...';
+    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    try {
+      const resp = await fetch('https://spirant.by/upload_sig.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, user_id: userId })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error('&#1054;&#1096;&#1080;&#1073;&#1082;&#1072; &#1089;&#1086;&#1093;&#1088;&#1072;&#1085;&#1077;&#1085;&#1080;&#1103;');
+      btn.textContent = '&#10003; &#1043;&#1086;&#1090;&#1086;&#1074;&#1086;!';
+      document.querySelector('.hint').textContent = '&#1055;&#1086;&#1076;&#1087;&#1080;&#1089;&#1100; &#1089;&#1086;&#1093;&#1088;&#1072;&#1085;&#1077;&#1085;&#1072;! &#1042;&#1077;&#1088;&#1085;&#1080;&#1090;&#1077;&#1089;&#1100; &#1074; Telegram &#1080; &#1085;&#1072;&#1078;&#1084;&#1080;&#1090;&#1077; «✅ &#1071; &#1087;&#1086;&#1076;&#1087;&#1080;&#1089;&#1072;&#1083;»';
+      setTimeout(() => { if (tg) tg.close(); }, 1500);
+    } catch(e) {
+      btn.disabled = false; btn.textContent = '&#1055;&#1086;&#1076;&#1090;&#1074;&#1077;&#1088;&#1076;&#1080;&#1090;&#1100; &#10003;';
+      alert('&#1054;&#1096;&#1080;&#1073;&#1082;&#1072;: ' + e.message);
+    }
+  });
+  setup();
+</script>
+</body>
+</html>
