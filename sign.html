@@ -19,12 +19,12 @@ button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16
 </style>
 </head>
 <body>
-<h2>&#1055;&#1086;&#1076;&#1087;&#1080;&#1096;&#1080;&#1090;&#1077; &#1076;&#1086;&#1075;&#1086;&#1074;&#1086;&#1088;</h2>
-<p class="hint">&#1056;&#1072;&#1089;&#1087;&#1080;&#1096;&#1080;&#1090;&#1077;&#1089;&#1100; &#1087;&#1072;&#1083;&#1100;&#1094;&#1077;&#1084; &#1080;&#1083;&#1080; &#1084;&#1099;&#1096;&#1100;&#1102;</p>
+<h2>Подпишите договор</h2>
+<p class="hint">Распишитесь пальцем или мышью</p>
 <canvas id="canvas"></canvas>
 <div class="buttons">
-  <button id="clear-btn">&#1054;&#1095;&#1080;&#1089;&#1090;&#1080;&#1090;&#1100;</button>
-  <button id="submit-btn">&#1055;&#1086;&#1076;&#1090;&#1074;&#1077;&#1088;&#1076;&#1080;&#1090;&#1100; &#10003;</button>
+  <button id="clear-btn">Очистить</button>
+  <button id="submit-btn">Подтвердить ✓</button>
 </div>
 <script>
   const tg = window.Telegram?.WebApp || null;
@@ -57,24 +57,24 @@ button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); hasDrawn = false;
   });
   document.getElementById('submit-btn').addEventListener('click', async () => {
-    if (!hasDrawn) { alert('&#1055;&#1086;&#1078;&#1072;&#1083;&#1091;&#1081;&#1089;&#1090;&#1072;, &#1087;&#1086;&#1089;&#1090;&#1072;&#1074;&#1100;&#1090;&#1077; &#1087;&#1086;&#1076;&#1087;&#1080;&#1089;&#1100;'); return; }
+    if (!hasDrawn) { alert('Пожалуйста, поставьте подпись'); return; }
     const btn = document.getElementById('submit-btn');
-    btn.disabled = true; btn.textContent = '&#1054;&#1090;&#1087;&#1088;&#1072;&#1074;&#1083;&#1103;&#1077;&#1084;...';
-    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    btn.disabled = true; btn.textContent = 'Отправляем...';
+    const base64img = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
     try {
       const resp = await fetch('https://spirant.by/upload_sig.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, user_id: userId })
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ image: base64img, user_id: userId })
       });
       const data = await resp.json();
-      if (!data.success) throw new Error('&#1054;&#1096;&#1080;&#1073;&#1082;&#1072; &#1089;&#1086;&#1093;&#1088;&#1072;&#1085;&#1077;&#1085;&#1080;&#1103;');
-      btn.textContent = '&#10003; &#1043;&#1086;&#1090;&#1086;&#1074;&#1086;!';
-      document.querySelector('.hint').textContent = '&#1055;&#1086;&#1076;&#1087;&#1080;&#1089;&#1100; &#1089;&#1086;&#1093;&#1088;&#1072;&#1085;&#1077;&#1085;&#1072;! &#1042;&#1077;&#1088;&#1085;&#1080;&#1090;&#1077;&#1089;&#1100; &#1074; Telegram &#1080; &#1085;&#1072;&#1078;&#1084;&#1080;&#1090;&#1077; «✅ &#1071; &#1087;&#1086;&#1076;&#1087;&#1080;&#1089;&#1072;&#1083;»';
+      if (!data.success) throw new Error('Ошибка сохранения');
+      btn.textContent = '✅ Готово!';
+      document.querySelector('.hint').textContent = 'Подпись сохранена! Вернитесь в Telegram и нажмите «✅ Я подписал»';
       setTimeout(() => { if (tg) tg.close(); }, 1500);
     } catch(e) {
-      btn.disabled = false; btn.textContent = '&#1055;&#1086;&#1076;&#1090;&#1074;&#1077;&#1088;&#1076;&#1080;&#1090;&#1100; &#10003;';
-      alert('&#1054;&#1096;&#1080;&#1073;&#1082;&#1072;: ' + e.message);
+      btn.disabled = false; btn.textContent = 'Подтвердить ✓';
+      alert('Ошибка: ' + e.message);
     }
   });
   setup();
