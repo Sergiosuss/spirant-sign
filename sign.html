@@ -29,10 +29,12 @@ button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16
 <script>
   const tg = window.Telegram?.WebApp || null;
   if (tg) { tg.ready(); tg.expand(); }
-  const userId = parseInt(new URLSearchParams(window.location.search).get('user_id') || '0');
+
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   let drawing = false, hasDrawn = false;
+  let strokes = [], current = [];
+
   function setup() {
     const w = window.innerWidth - 40;
     canvas.width = w; canvas.height = 200;
@@ -41,42 +43,58 @@ button { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 16
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+    return { x: Math.round(src.clientX - rect.left), y: Math.round(src.clientY - rect.top) };
   }
-  canvas.addEventListener('mousedown', e => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
-  canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; });
-  canvas.addEventListener('mouseup', () => { drawing = false; });
-  canvas.addEventListener('mouseleave', () => { drawing = false; });
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); hasDrawn = true; }, { passive: false });
-  canvas.addEventListener('touchend', () => { drawing = false; });
+
+  function startStroke(p) {
+    drawing = true;
+    current = [p.x, p.y];
+    ctx.beginPath(); ctx.moveTo(p.x, p.y);
+  }
+
+  function moveStroke(p) {
+    if (!drawing) return;
+    current.push(p.x, p.y);
+    ctx.lineTo(p.x, p.y); ctx.stroke();
+    hasDrawn = true;
+  }
+
+  function endStroke() {
+    if (drawing && current.length >= 4) strokes.push(current);
+    current = []; drawing = false;
+  }
+
+  canvas.addEventListener('mousedown', e => startStroke(getPos(e)));
+  canvas.addEventListener('mousemove', e => moveStroke(getPos(e)));
+  canvas.addEventListener('mouseup', endStroke);
+  canvas.addEventListener('mouseleave', endStroke);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); startStroke(getPos(e)); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); moveStroke(getPos(e)); }, { passive: false });
+  canvas.addEventListener('touchend', endStroke);
+
   document.getElementById('clear-btn').addEventListener('click', () => {
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); hasDrawn = false;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    strokes = []; current = []; hasDrawn = false;
   });
-  document.getElementById('submit-btn').addEventListener('click', async () => {
+
+  document.getElementById('submit-btn').addEventListener('click', () => {
     if (!hasDrawn) { alert('Пожалуйста, поставьте подпись'); return; }
     const btn = document.getElementById('submit-btn');
     btn.disabled = true; btn.textContent = 'Отправляем...';
-    const base64img = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-    try {
-      const resp = await fetch('https://spirant.by/upload_sig.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ image: base64img, user_id: userId })
-      });
-      const data = await resp.json();
-      if (!data.success) throw new Error('Ошибка сохранения');
+    const payload = JSON.stringify({ s: strokes, w: canvas.width, h: canvas.height });
+    if (tg) {
+      tg.sendData(payload);
       btn.textContent = '✅ Готово!';
-      document.querySelector('.hint').textContent = 'Подпись сохранена! Вернитесь в Telegram и нажмите «✅ Я подписал»';
-      setTimeout(() => { if (tg) tg.close(); }, 1500);
-    } catch(e) {
+    } else {
       btn.disabled = false; btn.textContent = 'Подтвердить ✓';
-      alert('Ошибка: ' + e.message);
+      alert('Ошибка: Telegram WebApp недоступен');
     }
   });
+
   setup();
 </script>
 </body>
